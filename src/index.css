@@ -1,0 +1,175 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Textile Design System - Premium fabric-inspired colors and gradients */
+
+@layer base {
+  :root {
+    /* Base colors - warm cream and rich charcoal */
+    --background: 32 20% 97%;
+    --foreground: 25 15% 15%;
+
+    /* Card system - soft ivory with warm undertones */
+    --card: 30 25% 98%;
+    --card-foreground: 25 15% 15%;
+
+    /* Popover elements */
+    --popover: 30 25% 98%;
+    --popover-foreground: 25 15% 15%;
+
+    /* Primary - deep indigo inspired by denim */
+    --primary: 215 35% 25%;
+    --primary-foreground: 30 25% 98%;
+
+    /* Secondary - warm linen beige */
+    --secondary: 35 25% 88%;
+    --secondary-foreground: 25 15% 15%;
+
+    /* Muted tones - soft cotton white */
+    --muted: 32 15% 92%;
+    --muted-foreground: 25 10% 45%;
+
+    /* Accent - silk cream with golden undertones */
+    --accent: 42 35% 85%;
+    --accent-foreground: 25 15% 15%;
+
+    /* Destructive remains functional */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 30 25% 98%;
+
+    /* Borders and inputs - subtle linen texture */
+    --border: 35 20% 85%;
+    --input: 35 20% 85%;
+    --ring: 215 35% 25%;
+
+    /* Enhanced radius for organic feel */
+    --radius: 0.75rem;
+
+    /* Textile-specific design tokens */
+    --textile-cream: 32 20% 97%;
+    --textile-linen: 35 25% 88%;
+    --textile-cotton: 32 15% 92%;
+    --textile-silk: 42 35% 85%;
+    --textile-denim: 215 35% 25%;
+    --textile-charcoal: 25 15% 15%;
+
+    /* Elegant gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(var(--textile-cream)), hsl(var(--textile-linen)));
+    --gradient-silk: linear-gradient(120deg, hsl(var(--textile-silk)), hsl(var(--textile-cream)));
+    --gradient-denim: linear-gradient(135deg, hsl(var(--textile-denim)), hsl(215 30% 35%));
+
+    /* Sophisticated shadows */
+    --shadow-soft: 0 4px 20px -4px hsla(var(--textile-charcoal), 0.1);
+    --shadow-elegant: 0 8px 30px -8px hsla(var(--textile-charcoal), 0.15);
+    --shadow-dramatic: 0 20px 60px -15px hsla(var(--textile-charcoal), 0.2);
+
+    /* Smooth transitions */
+    --transition-gentle: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    
+  }
+
+  .dark {
+    /* Dark mode - sophisticated charcoal and warm accents */
+    --background: 25 15% 8%;
+    --foreground: 32 20% 95%;
+
+    --card: 25 15% 10%;
+    --card-foreground: 32 20% 95%;
+
+    --popover: 25 15% 10%;
+    --popover-foreground: 32 20% 95%;
+
+    --primary: 42 35% 75%;
+    --primary-foreground: 25 15% 8%;
+
+    --secondary: 25 10% 15%;
+    --secondary-foreground: 32 20% 95%;
+
+    --muted: 25 10% 15%;
+    --muted-foreground: 32 10% 65%;
+
+    --accent: 215 25% 20%;
+    --accent-foreground: 32 20% 95%;
+
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 32 20% 95%;
+
+    --border: 25 10% 20%;
+    --input: 25 10% 20%;
+    --ring: 42 35% 75%;
+
+    /* Dark mode textile tokens */
+    --textile-cream: 25 15% 8%;
+    --textile-linen: 25 10% 15%;
+    --textile-cotton: 25 10% 12%;
+    --textile-silk: 42 35% 75%;
+    --textile-denim: 215 25% 20%;
+    --textile-charcoal: 32 20% 95%;
+
+    /* Dark mode gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(var(--textile-cream)), hsl(var(--textile-linen)));
+    --gradient-silk: linear-gradient(120deg, hsl(var(--textile-denim)), hsl(var(--textile-linen)));
+    --gradient-denim: linear-gradient(135deg, hsl(215 25% 15%), hsl(215 20% 25%));
+
+    --sidebar-background: 25 15% 8%;
+    --sidebar-foreground: 32 20% 95%;
+    --sidebar-primary: 42 35% 75%;
+    --sidebar-primary-foreground: 25 15% 8%;
+    --sidebar-accent: 25 10% 15%;
+    --sidebar-accent-foreground: 32 20% 95%;
+    --sidebar-border: 25 10% 20%;
+    --sidebar-ring: 42 35% 75%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Brand gradient utility used for headings and active nav text */
+.gradient-text {
+  background: linear-gradient(90deg, #4A00E0 10%, #00C9FF 90%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Smooth scrolling for in-page anchors */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (max-width: 1024px) {
+  .disable-motion-lg {
+    transform: none !important;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar { 
+      display: none;
+    }

@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Sitemap: https://techtidecorporate.com/sitemap.xml
+
+# Crawl-delay can be added if you want to throttle bots (value in seconds)
+# Crawl-delay: 10
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: *
+Allow: /

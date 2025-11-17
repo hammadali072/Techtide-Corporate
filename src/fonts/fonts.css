@@ -1,0 +1,64 @@
+@font-face {
+    font-family: 'Lexend';
+    src: url('../fonts/Lexend-Bold.eot');
+    src: url('../fonts/Lexend-Bold.eot?#iefix') format('embedded-opentype'),
+        url('../fonts/Lexend-Bold.woff2') format('woff2'),
+        url('../fonts/Lexend-Bold.woff') format('woff'),
+        url('../fonts/Lexend-Bold.ttf') format('truetype'),
+        url('../fonts/Lexend-Bold.svg#Lexend-Bold') format('svg');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'KumbhSans';
+    src: url('../fonts/KumbhSans-SemiBold.eot');
+    src: url('../fonts/KumbhSans-SemiBold.eot?#iefix') format('embedded-opentype'),
+        url('../fonts/KumbhSans-SemiBold.woff2') format('woff2'),
+        url('../fonts/KumbhSans-SemiBold.woff') format('woff'),
+        url('../fonts/KumbhSans-SemiBold.ttf') format('truetype'),
+        url('../fonts/KumbhSans-SemiBold.svg#KumbhSans-SemiBold') format('svg');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'KumbhSans';
+    src: url('../fonts/KumbhSans-Regular.eot');
+    src: url('../fonts/KumbhSans-Regular.eot?#iefix') format('embedded-opentype'),
+        url('../fonts/KumbhSans-Regular.woff2') format('woff2'),
+        url('../fonts/KumbhSans-Regular.woff') format('woff'),
+        url('../fonts/KumbhSans-Regular.ttf') format('truetype'),
+        url('../fonts/KumbhSans-Regular.svg#KumbhSans-Regular') format('svg');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'KumbhSans';
+    src: url('../fonts/KumbhSans-Medium.eot');
+    src: url('../fonts/KumbhSans-Medium.eot?#iefix') format('embedded-opentype'),
+        url('../fonts/KumbhSans-Medium.woff2') format('woff2'),
+        url('../fonts/KumbhSans-Medium.woff') format('woff'),
+        url('../fonts/KumbhSans-Medium.ttf') format('truetype'),
+        url('../fonts/KumbhSans-Medium.svg#KumbhSans-Medium') format('svg');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'KumbhSans';
+    src: url('../fonts/KumbhSans-Bold.eot');
+    src: url('../fonts/KumbhSans-Bold.eot?#iefix') format('embedded-opentype'),
+        url('../fonts/KumbhSans-Bold.woff2') format('woff2'),
+        url('../fonts/KumbhSans-Bold.woff') format('woff'),
+        url('../fonts/KumbhSans-Bold.ttf') format('truetype'),
+        url('../fonts/KumbhSans-Bold.svg#KumbhSans-Bold') format('svg');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}

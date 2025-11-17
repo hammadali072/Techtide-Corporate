@@ -1,0 +1,14 @@
+/* .swiper-wrapper {
+    padding: 20px;
+} */
+.swiper-button-prev::after, .swiper-button-next::after {
+    content: none;
+}
+
+/* Hide navigation arrows on mobile */
+@media (max-width: 768px) {
+  .swiper-button-next,
+  .swiper-button-prev {
+    display: none !important;
+  }
+}
