@@ -197,6 +197,8 @@ const OfficeMembersTab: React.FC = () => {
             >
               <option value="">Select Role</option>
               <option value="CEO">CEO</option>
+              <option value="CFO">CFO</option>
+              <option value="CTO">CTO</option>
               <option value="COO">COO</option>
               <option value="DO">Director Operation</option>
               <option value="Employee">Employee</option>

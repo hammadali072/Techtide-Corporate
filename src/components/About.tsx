@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Award, Users, Target, BarChart3, Heart, Globe, Shield, Zap, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import foundationVideo from '../assets/home.mp4';
+import foundationVideo from '../assets/Techtide foundation.mp4';
+import Achievements from '../assets/leadership.json';
 import Lottie from 'lottie-react';
-import Leadership from "@/assets/leadership.json"
+import Leadership from "@/assets/Team.json";
 import { motion, useInView } from 'framer-motion';
 import PSEBLOGO from '../assets/Pakistan-Software-Export-Board-PSEB-Logo.jpg'
 import SECPLOGO from '../assets/Securities-and-Exchange-Commission-of-Pakistan-Logo-Vector.svg-.png'
@@ -227,7 +228,7 @@ const About = () => {
         {/* Achievements & Recognition Section */}
         <div ref={addToRefs} className="fade-in-up mb-20">
           <div className="bg-gradient-to-br from-indigo-200 to-purple-50 rounded-3xl p-8 md:p-12 shadow-xl border border-indigo-100">
-            <h3 className="text-3xl font-bold text-center mb-12 text-indigo-800">Achievements & Recognition</h3>
+            <h3 className="text-3xl font-bold text-center mb-12 text-indigo-800">Achievements & Certifications</h3>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
               <div>
@@ -251,12 +252,12 @@ const About = () => {
                 </div>
               </div>
 
-              <div className="relative">
-                <div className="bg-white rounded-2xl p-2 shadow-lg transform rotate-2">
-                  <img
-                    className="rounded-xl w-full h-64 object-cover"
-                    src="https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80"
-                    alt="Awards and Recognition"
+              <div className="relative min-h-96">
+                <div className=" bg-white rounded-2xl">
+                  <Lottie
+                    animationData={Achievements}
+                    loop={true}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>
                 <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-purple-500/20 rounded-full -z-10" />
@@ -280,9 +281,7 @@ const About = () => {
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end">
-                
-                </div>
+               
               </div>
 
               <div className="p-8 md:p-12">
@@ -295,6 +294,16 @@ const About = () => {
 
                   <div>
                     <h4 className="text-xl font-semibold text-blue-600">Muhammad Moazzam</h4>
+                    <p className="text-gray-600">CFO</p>
+                    <p className="text-gray-700 mt-2">Oversees daily operations and ensures our projects meet the highest standards of quality and client satisfaction.</p>
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-semibold text-blue-600">Sajideen Hassan</h4>
+                    <p className="text-gray-600">CTO</p>
+                    <p className="text-gray-700 mt-2">Oversees daily operations and ensures our projects meet the highest standards of quality and client satisfaction.</p>
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-semibold text-blue-600">Shamin Gull</h4>
                     <p className="text-gray-600">COO</p>
                     <p className="text-gray-700 mt-2">Oversees daily operations and ensures our projects meet the highest standards of quality and client satisfaction.</p>
                   </div>
