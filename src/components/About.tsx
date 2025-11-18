@@ -9,6 +9,8 @@ import Leadership from "@/assets/Team.json";
 import { motion, useInView } from 'framer-motion';
 import PSEBLOGO from '../assets/Pakistan-Software-Export-Board-PSEB-Logo.jpg'
 import SECPLOGO from '../assets/Securities-and-Exchange-Commission-of-Pakistan-Logo-Vector.svg-.png'
+import LeaderShipPAgination from './ui/leaderShipPagination';
+import LeaderShipPagination from './ui/leaderShipPagination';
 
 const About = () => {
   const navigate = useNavigate();
@@ -267,57 +269,16 @@ const About = () => {
           </div>
         </div>
 
+       
         {/* Team Section */}
-        <div ref={addToRefs} className="fade-in-up">
-          <h3 className="text-3xl font-bold text-center mb-12 text-gray-800">Leadership & Team</h3>
-
-          <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
-            <div className="grid grid-cols-1 lg:grid-cols-2">
-              <div className="relative min-h-96">
-                <div className="w-full h-full">
-                  <Lottie
-                    animationData={Leadership}
-                    loop={true}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                </div>
-               
-              </div>
-
-              <div className="p-8 md:p-12">
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="text-xl font-semibold text-purple-600">Muhammad Nadir</h4>
-                    <p className="text-gray-600">CEO & Founder</p>
-                    <p className="text-gray-700 mt-2">With 3+ years of experience in web design, social media, and business development, Muhammad leads our vision and strategic direction.</p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xl font-semibold text-blue-600">Muhammad Moazzam</h4>
-                    <p className="text-gray-600">CFO</p>
-                    <p className="text-gray-700 mt-2">Oversees daily operations and ensures our projects meet the highest standards of quality and client satisfaction.</p>
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-semibold text-blue-600">Sajideen Hassan</h4>
-                    <p className="text-gray-600">CTO</p>
-                    <p className="text-gray-700 mt-2">Oversees daily operations and ensures our projects meet the highest standards of quality and client satisfaction.</p>
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-semibold text-blue-600">Shamin Gull</h4>
-                    <p className="text-gray-600">COO</p>
-                    <p className="text-gray-700 mt-2">Oversees daily operations and ensures our projects meet the highest standards of quality and client satisfaction.</p>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          </div>
+        <div ref={addToRefs}>
+                  <LeaderShipPagination/>
         </div>
 
         {/* Call to Action */}
         <div
           ref={addToRefs}
-          className={`fade-in-up mt-20 text-center transition-all duration-1000 delay-1000 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+          className={`fade-in-up mt-16 text-center transition-all duration-1000 delay-1000 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
         >
           <Link to="/ourteam">
             <Button size="lg" variant="default">Connect With Our Team</Button>
