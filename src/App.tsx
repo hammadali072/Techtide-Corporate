@@ -10,6 +10,7 @@ import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import Index from "./pages/Index";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
+import ScrollToTop from "./components/ScrollToTop";
 
 // Lazy load all page components for optimal performance
 const Careers = lazy(() => import("./pages/Careers"));
@@ -39,7 +40,7 @@ const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeHash, setActiveHash] = useState<string>(window.location.hash || "#home");
-  
+
   const scrollToId = (id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -68,7 +69,7 @@ const App = () => {
       }, interval);
     });
   };
-  
+
   const handleAnchorClick = (href: string, e?: MouseEvent<HTMLAnchorElement>) => {
     if (e) e.preventDefault();
     const raw = href.replace(/^#/, '').replace(/^\//, '');
@@ -91,7 +92,7 @@ const App = () => {
   const display = () => {
     return location.pathname !== "/admin-dashboard" && location.pathname !== "/my-tasks";
   }
-  
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -99,92 +100,93 @@ const App = () => {
           <Toaster />
           <Sonner />
           {display() ? <Navigation handleAnchorClick={handleAnchorClick} /> : null}
+          <ScrollToTop />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/services" element={<Index />} />
             <Route path="/about" element={<Index />} />
             <Route path="/contact" element={<Index />} />
-            <Route 
-              path="/all-services" 
+            <Route
+              path="/all-services"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <AllProductsPage />
                 </Suspense>
-              } 
+              }
             />
-            <Route 
-              path="/product/:productName" 
+            <Route
+              path="/product/:productName"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <ProductDetailPage />
                 </Suspense>
-              } 
+              }
             />
-            <Route 
-              path="/admin-dashboard" 
+            <Route
+              path="/admin-dashboard"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <AdminDashboard />
                 </Suspense>
-              } 
+              }
             />
             <Route path="/my-tasks" element={<MyTasks />} />
             <Route path="/tasks/:id" element={<TaskDetail />} />
-            <Route 
-              path="/ourteam" 
+            <Route
+              path="/ourteam"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <OurTeam />
                 </Suspense>
-              } 
+              }
             />
-            <Route 
-              path="/careers" 
+            <Route
+              path="/careers"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <Careers />
                 </Suspense>
-              } 
+              }
             />
-            <Route 
-              path="/blog" 
+            <Route
+              path="/blog"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <BlogList />
                 </Suspense>
-              } 
+              }
             />
-            <Route 
-              path="/blog/:slug" 
+            <Route
+              path="/blog/:slug"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <BlogPost />
                 </Suspense>
-              } 
+              }
             />
-            <Route 
-              path="/application/:id" 
+            <Route
+              path="/application/:id"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <ApplicationView />
                 </Suspense>
-              } 
+              }
             />
-            <Route 
-              path="/internship/:id" 
+            <Route
+              path="/internship/:id"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <InternshipView />
                 </Suspense>
-              } 
+              }
             />
-            <Route 
-              path="*" 
+            <Route
+              path="*"
               element={
                 <Suspense fallback={<PageLoading />}>
                   <NotFound />
                 </Suspense>
-              } 
+              }
             />
           </Routes>
           {display() ? <Footer handleAnchorClick={handleAnchorClick} /> : null}
