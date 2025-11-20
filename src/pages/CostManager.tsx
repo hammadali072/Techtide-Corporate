@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
@@ -18,6 +18,10 @@ interface CostRecord {
   type: string;
   description: string;
   date?: string;
+  transactions?: Transaction[];
+  totalReceived?: number;
+  totalPaid?: number;
+  currentBalance?: number;
 }
 
 interface FormData {
@@ -41,6 +45,16 @@ interface ChartData {
   name: string;
   value: number;
   color: string;
+}
+
+interface Transaction {
+  id?: string;
+  date?: string;
+  amount?: number;
+  type?: string;
+  description?: string;
+  employee?: string;
+  balanceAfter?: number;
 }
 
 const CostManager: React.FC = () => {
@@ -74,6 +88,12 @@ const CostManager: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<Notification>({ show: false, message: "", type: "info" });
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+
+  // Transaction editing state
+  const [showTxnModal, setShowTxnModal] = useState<boolean>(false);
+  const [editingTransaction, setEditingTransaction] = useState<{ recordId: string; txn: Transaction } | null>(null);
+  const [txnForm, setTxnForm] = useState<Transaction | null>(null);
+  const [newTxn, setNewTxn] = useState<Transaction>({ amount: 0, type: 'paid', description: '', employee: '' });
 
   const showNotification = (message: string, type: Notification["type"] = "info") => {
     setNotification({ show: true, message, type });
@@ -121,7 +141,7 @@ const CostManager: React.FC = () => {
     loadFolders();
   }, []);
 
-  const loadData = async (folderName: string) => {
+  const loadData = useCallback(async (folderName: string) => {
     if (!folderName) return;
     try {
       setLoading(true);
@@ -129,10 +149,67 @@ const CostManager: React.FC = () => {
       const data = await get(folderRef);
 
       if (data.exists()) {
-        const fetchedData = Object.entries(data.val()).map(([key, value]: [string, any]) => ({
-          firebaseID: key,
-          ...value,
-        }));
+        const raw = data.val();
+        const fetchedData = Object.entries(raw).map(([key, value]: [string, unknown]) => {
+          const item = (value as Record<string, unknown>) || {};
+
+          // Transactions may be stored as an object (recommended for RTDB) or as an array.
+          let transactionsArr: Transaction[] = [];
+          const maybeTransactions = item.transactions as unknown;
+          if (maybeTransactions) {
+            if (Array.isArray(maybeTransactions)) {
+              const arr = maybeTransactions as unknown[];
+              transactionsArr = arr.map((t, idx) => {
+                const tx = (t as Record<string, unknown>) || {};
+                return {
+                  id: (tx.id as string) ?? String(idx),
+                  date: tx.date as string | undefined,
+                  amount: tx.amount ? Number(tx.amount as number) : 0,
+                  type: tx.type as string | undefined,
+                  description: tx.description as string | undefined,
+                  employee: tx.employee as string | undefined,
+                  balanceAfter: tx.balanceAfter ? Number(tx.balanceAfter as number) : 0,
+                } as Transaction;
+              });
+            } else {
+              const obj = maybeTransactions as Record<string, unknown>;
+              transactionsArr = Object.keys(obj).map((k) => {
+                const tx = (obj[k] as Record<string, unknown>) || {};
+                return {
+                  id: k,
+                  date: tx.date as string | undefined,
+                  amount: tx.amount ? Number(tx.amount as number) : 0,
+                  type: tx.type as string | undefined,
+                  description: tx.description as string | undefined,
+                  employee: tx.employee as string | undefined,
+                  balanceAfter: tx.balanceAfter ? Number(tx.balanceAfter as number) : 0,
+                } as Transaction;
+              });
+            }
+          }
+
+          // Compute aggregates from transactions (defensive defaults)
+          const totalReceived = transactionsArr.reduce((acc, t) => acc + (t.type === 'received' ? Number(t.amount || 0) : 0), 0);
+          const totalPaid = transactionsArr.reduce((acc, t) => acc + (t.type === 'paid' ? Number(t.amount || 0) : 0), 0);
+          const currentBalance = totalReceived - totalPaid;
+
+          const totalAmount = Number(item.totalAmount as number || 0);
+          const amountReceived = totalReceived; // compatibility with old UI field
+          const amountRemaining = Number((totalAmount - totalReceived) || 0);
+
+          return {
+            firebaseID: key,
+            ...(item as Record<string, unknown>),
+            transactions: transactionsArr,
+            totalReceived,
+            totalPaid,
+            currentBalance,
+            totalAmount,
+            amountReceived,
+            amountRemaining,
+          } as CostRecord;
+        });
+
         setCosts(fetchedData);
       } else {
         setCosts([]);
@@ -143,7 +220,7 @@ const CostManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Open a folder: set selected file, update lastAccessed in DB, and reorder local files
   const handleOpenFolder = async (folderName: string) => {
@@ -168,6 +245,8 @@ const CostManager: React.FC = () => {
         const filtered = prev.filter(f => f !== folderName);
         return [folderName, ...filtered];
       });
+      // Ensure data for this folder is loaded immediately (covers reopening same folder)
+      await loadData(folderName);
     } catch (err) {
       console.error("Error opening folder:", err);
       showNotification("Error opening folder", "error");
@@ -176,9 +255,11 @@ const CostManager: React.FC = () => {
     }
   };
 
+  // Keep simple dependency: we explicitly want to call loadData when selectedFile changes
   useEffect(() => {
     if (selectedFile) loadData(selectedFile);
-  }, [selectedFile]); // Add loadData to dependencies or wrap it in useCallback
+    // loadData is stable via useCallback
+  }, [selectedFile, loadData]);
 
 
   const handleCreateFile = async () => {
@@ -252,6 +333,186 @@ const CostManager: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleTxnChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    if (!txnForm) return;
+    setTxnForm({ ...txnForm, [e.target.name]: e.target.value } as Transaction);
+  };
+
+  const handleNewTxnChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setNewTxn({ ...newTxn, [e.target.name]: e.target.value } as Transaction);
+  };
+
+  const handleAddTransaction = async (recordId: string) => {
+    if (!selectedFile) return showNotification('Please open a folder first', 'warning');
+    const amountNum = Number(newTxn.amount || 0);
+    if (!amountNum || amountNum <= 0) return showNotification('Please enter a valid amount', 'warning');
+
+    try {
+      setLoading(true);
+      const txnRef = ref(db, `${selectedFile}/${recordId}/transactions`);
+      const newTxnRef = push(txnRef);
+      const txnId = newTxnRef.key as string;
+
+      const recordRef = ref(db, `${selectedFile}/${recordId}`);
+      const snap = await get(recordRef);
+      if (!snap.exists()) throw new Error('Parent record not found');
+      const item = snap.val() as Record<string, unknown>;
+
+      const prevTotalReceived = Number(item.totalReceived || 0);
+      const prevTotalPaid = Number(item.totalPaid || 0);
+
+      const txnType = String(newTxn.type || 'paid');
+      const newTotalReceived = prevTotalReceived + (txnType === 'received' ? amountNum : 0);
+      const newTotalPaid = prevTotalPaid + (txnType === 'paid' ? amountNum : 0);
+      const newCurrentBalance = newTotalReceived - newTotalPaid;
+
+      const txnObj = {
+        id: txnId,
+        date: new Date().toISOString(),
+        amount: amountNum,
+        type: txnType,
+        description: newTxn.description || '',
+        employee: txnType === 'paid' ? (newTxn.employee || '') : (newTxn.employee || ''),
+        balanceAfter: newCurrentBalance,
+      };
+
+      await update(ref(db), {
+        [`${selectedFile}/${recordId}/transactions/${txnId}`]: txnObj,
+        [`${selectedFile}/${recordId}/totalReceived`]: newTotalReceived,
+        [`${selectedFile}/${recordId}/totalPaid`]: newTotalPaid,
+        [`${selectedFile}/${recordId}/currentBalance`]: newCurrentBalance,
+        [`${selectedFile}/${recordId}/updatedAt`]: new Date().toISOString(),
+      });
+
+      showNotification('Transaction added', 'success');
+      setNewTxn({ amount: 0, type: 'paid', description: '', employee: '' });
+      await loadData(selectedFile);
+      await handleViewDetail({ firebaseID: recordId } as CostRecord);
+    } catch (err) {
+      console.error('Error adding transaction from detail modal:', err);
+      showNotification('Error adding transaction', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openEditTransaction = (recordId: string, txn: Transaction) => {
+    setEditingTransaction({ recordId, txn });
+    setTxnForm({ ...txn });
+    setShowTxnModal(true);
+  };
+
+  const handleSubmitTxnEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction || !txnForm) return;
+    if (!selectedFile) return showNotification('Please open a folder first', 'warning');
+
+    try {
+      setLoading(true);
+      const { recordId, txn } = editingTransaction;
+      const txnId = txn.id as string;
+
+      // Fetch current record to compute aggregates safely
+      const recordRef = ref(db, `${selectedFile}/${recordId}`);
+      const snap = await get(recordRef);
+      if (!snap.exists()) throw new Error('Parent record not found');
+      const item = snap.val() as Record<string, unknown>;
+
+      const prevTransactions = item.transactions || {};
+      const prevTxn = (((prevTransactions as Record<string, unknown>)[txnId]) as Record<string, unknown>) || {};
+      const prevAmount = Number(prevTxn.amount as number || 0);
+      const prevType = String(prevTxn.type as string || 'received');
+
+      const newAmount = Number(txnForm.amount || 0);
+      const newType = String(txnForm.type || 'received');
+
+      const prevTotalReceived = Number(item.totalReceived || 0);
+      const prevTotalPaid = Number(item.totalPaid || 0);
+
+      const deltaReceived = (newType === 'received' ? newAmount : 0) - (prevType === 'received' ? prevAmount : 0);
+      const deltaPaid = (newType === 'paid' ? newAmount : 0) - (prevType === 'paid' ? prevAmount : 0);
+
+      const newTotalReceived = prevTotalReceived + deltaReceived;
+      const newTotalPaid = prevTotalPaid + deltaPaid;
+      const newCurrentBalance = newTotalReceived - newTotalPaid;
+
+      const newTxnObj = {
+        ...prevTxn,
+        id: txnId,
+        date: txnForm.date ? new Date(String(txnForm.date)).toISOString() : (prevTxn.date as string) || new Date().toISOString(),
+        amount: newAmount,
+        type: newType,
+        description: txnForm.description || '',
+        employee: txnForm.employee || '',
+        balanceAfter: newCurrentBalance,
+      };
+
+      // Multi-path update: update transaction and aggregates
+      await update(ref(db), {
+        [`${selectedFile}/${recordId}/transactions/${txnId}`]: newTxnObj,
+        [`${selectedFile}/${recordId}/totalReceived`]: newTotalReceived,
+        [`${selectedFile}/${recordId}/totalPaid`]: newTotalPaid,
+        [`${selectedFile}/${recordId}/currentBalance`]: newCurrentBalance,
+        [`${selectedFile}/${recordId}/updatedAt`]: new Date().toISOString(),
+      });
+
+      showNotification('Transaction updated', 'success');
+      setShowTxnModal(false);
+      setEditingTransaction(null);
+      setTxnForm(null);
+      await loadData(selectedFile);
+      await handleViewDetail({ firebaseID: recordId } as CostRecord);
+    } catch (err) {
+      console.error('Error updating transaction:', err);
+      showNotification('Error updating transaction', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteTransaction = async (recordId: string, txnId: string) => {
+    if (!window.confirm('Delete this transaction?')) return;
+    if (!selectedFile) return showNotification('Please open a folder first', 'warning');
+
+    try {
+      setLoading(true);
+      const recordRef = ref(db, `${selectedFile}/${recordId}`);
+      const snap = await get(recordRef);
+      if (!snap.exists()) throw new Error('Parent record not found');
+      const item = snap.val() as Record<string, unknown>;
+
+      const prevTransactions = item.transactions || {};
+      const prevTxn = (((prevTransactions as Record<string, unknown>)[txnId]) as Record<string, unknown>) || {};
+      const prevAmount = Number(prevTxn.amount as number || 0);
+      const prevType = String(prevTxn.type as string || 'received');
+
+      const prevTotalReceived = Number(item.totalReceived || 0);
+      const prevTotalPaid = Number(item.totalPaid || 0);
+
+      const newTotalReceived = prevTotalReceived - (prevType === 'received' ? prevAmount : 0);
+      const newTotalPaid = prevTotalPaid - (prevType === 'paid' ? prevAmount : 0);
+      const newCurrentBalance = newTotalReceived - newTotalPaid;
+
+      // Remove transaction then update aggregates
+      await remove(ref(db, `${selectedFile}/${recordId}/transactions/${txnId}`));
+      await update(ref(db, `${selectedFile}/${recordId}`), {
+        totalReceived: newTotalReceived,
+        totalPaid: newTotalPaid,
+        currentBalance: newCurrentBalance,
+        updatedAt: new Date().toISOString(),
+      });
+
+      showNotification('Transaction deleted', 'success');
+      await loadData(selectedFile);
+      await handleViewDetail({ firebaseID: recordId } as CostRecord);
+    } catch (err) {
+      console.error('Error deleting transaction:', err);
+      showNotification('Error deleting transaction', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.reason || !formData.totalAmount)
@@ -260,23 +521,121 @@ const CostManager: React.FC = () => {
 
     try {
       setLoading(true);
+      // If editing a record's metadata (not transactions)
       if (isEditing && editIndex !== null) {
-        const recordId = costs[editIndex].firebaseID;
-        const recordRef = ref(db, `${selectedFile}/${recordId}`);
-        await update(recordRef, {
-          ...formData,
-          amountRemaining: Number(formData.totalAmount) - Number(formData.amountReceived)
-        });
-        showNotification("Record updated successfully", "success");
+        if (editIndex < 0 || editIndex >= costs.length) {
+          showNotification("Invalid record index", "error");
+        } else {
+          const recordId = costs[editIndex].firebaseID;
+          const recordRef = ref(db, `${selectedFile}/${recordId}`);
+          // Update only top-level metadata fields; do not overwrite transactions or aggregates here
+          await update(recordRef, {
+            reason: formData.reason,
+            totalAmount: Number(formData.totalAmount),
+            dueDate: formData.dueDate,
+            category: formData.category,
+            type: formData.type,
+            description: formData.description || '',
+            updatedAt: new Date().toISOString(),
+          });
+          showNotification("Record updated successfully", "success");
+        }
       } else {
-        const folderRef = ref(db, selectedFile);
-        const newRecordRef = push(folderRef);
-        await set(newRecordRef, {
-          ...formData,
-          totalAmount: Number(formData.totalAmount),
-          date: formData.dueDate,
-        });
-        showNotification("Record added successfully", "success");
+        // Adding a transaction: if a record with same reason exists, append transaction; otherwise create record with initial transaction
+        const amount = Number(formData.amountReceived || 0) || Number(formData.totalAmount || 0);
+        const txnType = formData.type || 'received';
+
+        // Find existing record by reason (case-sensitive as before, can be adjusted)
+        const existing = costs.find(c => (c.reason || '').trim() === (formData.reason || '').trim());
+
+        if (existing) {
+          // Append transaction under existing record
+          const txnRef = ref(db, `${selectedFile}/${existing.firebaseID}/transactions`);
+          const newTxnRef = push(txnRef);
+          const txnId = newTxnRef.key as string;
+
+          const prevTotalReceived = Number(existing.totalReceived || 0);
+          const prevTotalPaid = Number(existing.totalPaid || 0);
+
+          const newTotalReceived = prevTotalReceived + (txnType === 'received' ? amount : 0);
+          const newTotalPaid = prevTotalPaid + (txnType === 'paid' ? amount : 0);
+          const newCurrentBalance = newTotalReceived - newTotalPaid;
+
+          const txnObj = {
+            id: txnId,
+            date: new Date().toISOString(),
+            amount,
+            type: txnType,
+            description: formData.description || '',
+            employee: formData.type === 'paid' ? (formData.description || '') : '',
+            balanceAfter: newCurrentBalance,
+          };
+
+          // Multi-path update: add transaction and update aggregates
+          await update(ref(db), {
+            [`${selectedFile}/${existing.firebaseID}/transactions/${txnId}`]: txnObj,
+            [`${selectedFile}/${existing.firebaseID}/totalReceived`]: newTotalReceived,
+            [`${selectedFile}/${existing.firebaseID}/totalPaid`]: newTotalPaid,
+            [`${selectedFile}/${existing.firebaseID}/currentBalance`]: newCurrentBalance,
+            [`${selectedFile}/${existing.firebaseID}/updatedAt`]: new Date().toISOString(),
+          });
+          showNotification("Transaction added to existing record", "success");
+        } else {
+          // Create new record with an initial transaction
+          const folderRef = ref(db, selectedFile);
+          const newRecordRef = push(folderRef);
+          const recordId = newRecordRef.key as string;
+
+          // create initial transaction under record
+          const txnTempRef = ref(db, `${selectedFile}/${recordId}/transactions`);
+          const newTxnRef = push(txnTempRef);
+          const txnId = newTxnRef.key as string;
+
+          const amountNum = Number(formData.amountReceived || formData.totalAmount || 0);
+          const initialReceived = txnType === 'received' ? amountNum : 0;
+          const initialPaid = txnType === 'paid' ? amountNum : 0;
+          const initialBalance = initialReceived - initialPaid;
+
+          const recordObj: Record<string, unknown> = {
+            reason: formData.reason,
+            totalAmount: Number(formData.totalAmount || 0),
+            totalReceived: initialReceived,
+            totalPaid: initialPaid,
+            currentBalance: initialBalance,
+            // include metadata fields so they show on record screen
+            type: formData.type || 'debit',
+            category: formData.category || 'other',
+            dueDate: formData.dueDate || '',
+            description: formData.description || '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            // compatibility fields used by UI
+            amountReceived: initialReceived,
+            amountRemaining: Number((Number(formData.totalAmount || 0) - initialReceived) || 0),
+          };
+
+          const txnObj = {
+            id: txnId,
+            date: new Date().toISOString(),
+            amount: amountNum,
+            type: txnType,
+            description: formData.description || '',
+            employee: txnType === 'paid' ? (formData.description || '') : '',
+            balanceAfter: initialBalance,
+          };
+
+          // Write record and initial transaction together under the record path
+          const recordObjWithTransactions: Record<string, unknown> = {
+            ...recordObj,
+            transactions: {
+              [txnId]: txnObj,
+            },
+          };
+
+          // Use set on the record path so we don't include both a parent and its descendant in the same update map
+          await set(ref(db, `${selectedFile}/${recordId}`), recordObjWithTransactions);
+          showNotification("Record created with initial transaction", "success");
+        }
       }
       await loadData(selectedFile);
       setFormData({
@@ -301,17 +660,24 @@ const CostManager: React.FC = () => {
   };
 
   const handleEdit = (index: number) => {
+    if (index == null || index < 0 || index >= costs.length) {
+      showNotification("Record not found for editing", "error");
+      return;
+    }
+
     const target = costs[index];
     setIsEditing(true);
     setEditIndex(index);
+
+    // For now we edit top-level record metadata (not transactions). Keep form fields compatible.
     setFormData({
-      reason: target.reason,
-      totalAmount: String(target.totalAmount),
-      amountReceived: String(target.amountReceived),
-      amountRemaining: String(target.amountRemaining),
-      dueDate: target.dueDate,
+      reason: target.reason || "",
+      totalAmount: String(target.totalAmount || ''),
+      amountReceived: String(target.totalReceived || ''),
+      amountRemaining: String(Number(target.totalAmount || 0) - Number(target.totalReceived || 0)),
+      dueDate: target.dueDate || '',
       category: target.category || "other",
-      type: target.type,
+      type: target.type || 'debit',
       description: target.description || "",
     });
     setShowForm(true);
@@ -447,9 +813,84 @@ const CostManager: React.FC = () => {
     }
   };
 
-  const handleViewDetail = (record: CostRecord) => {
-    setSelectedRecord(record);
-    setShowDetailModal(true);
+  const handleViewDetail = async (record: CostRecord) => {
+    if (!selectedFile) {
+      showNotification("Please open a folder first", "warning");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const recordRef = ref(db, `${selectedFile}/${record.firebaseID}`);
+      const snap = await get(recordRef);
+      if (snap.exists()) {
+        const item = snap.val() as Record<string, unknown>;
+
+        // normalize transactions
+        let transactionsArr: Transaction[] = [];
+        const maybeTransactions = item.transactions as unknown;
+        if (maybeTransactions) {
+          if (Array.isArray(maybeTransactions)) {
+            const arr = maybeTransactions as unknown[];
+            transactionsArr = arr.map((t, idx) => {
+              const tx = (t as Record<string, unknown>) || {};
+              return {
+                id: (tx.id as string) ?? String(idx),
+                date: tx.date as string | undefined,
+                amount: tx.amount ? Number(tx.amount as number) : 0,
+                type: tx.type as string | undefined,
+                description: tx.description as string | undefined,
+                employee: tx.employee as string | undefined,
+                balanceAfter: tx.balanceAfter ? Number(tx.balanceAfter as number) : 0,
+              } as Transaction;
+            });
+          } else {
+            const obj = maybeTransactions as Record<string, unknown>;
+            transactionsArr = Object.keys(obj).map((k) => {
+              const tx = (obj[k] as Record<string, unknown>) || {};
+              return {
+                id: k,
+                date: tx.date as string | undefined,
+                amount: tx.amount ? Number(tx.amount as number) : 0,
+                type: tx.type as string | undefined,
+                description: tx.description as string | undefined,
+                employee: tx.employee as string | undefined,
+                balanceAfter: tx.balanceAfter ? Number(tx.balanceAfter as number) : 0,
+              } as Transaction;
+            });
+          }
+        }
+
+        const totalReceived = Number(item.totalReceived || 0);
+        const totalPaid = Number(item.totalPaid || 0);
+        const currentBalance = Number(item.currentBalance || (totalReceived - totalPaid));
+
+        setSelectedRecord({
+          firebaseID: record.firebaseID,
+          reason: String(item.reason || ''),
+          totalAmount: Number(item.totalAmount || 0),
+          amountReceived: totalReceived,
+          amountRemaining: Number((Number(item.totalAmount || 0) - totalReceived) || 0),
+          dueDate: String(item.dueDate || ''),
+          category: String(item.category || 'other'),
+          type: String(item.type || ''),
+          description: String(item.description || ''),
+          transactions: transactionsArr,
+          totalReceived,
+          totalPaid,
+          currentBalance,
+        } as CostRecord);
+      } else {
+        // fallback to the passed record
+        setSelectedRecord(record);
+      }
+      setShowDetailModal(true);
+    } catch (err) {
+      console.error('Error fetching record detail:', err);
+      showNotification('Error fetching record', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isTodayDue = (dateString: string) => {
@@ -511,8 +952,8 @@ const CostManager: React.FC = () => {
     if (typeFilter === "all") return true;
     return c.type === typeFilter;
   }).sort((a, b) => {
-    let aValue: any = a[sortBy];
-    let bValue: any = b[sortBy];
+    let aValue: unknown = a[sortBy];
+    let bValue: unknown = b[sortBy];
 
     if (sortBy === "dueDate" || sortBy === "date") {
       aValue = new Date(aValue);
@@ -1017,7 +1458,7 @@ const CostManager: React.FC = () => {
                                   <Eye className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={() => handleEdit(categoryFilteredCosts.findIndex(x => x.firebaseID === c.firebaseID))}
+                                  onClick={() => handleEdit(costs.findIndex(x => x.firebaseID === c.firebaseID))}
                                   className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-lg transition-all shadow-sm hover:shadow-md"
                                   title="Edit"
                                 >
@@ -1040,6 +1481,53 @@ const CostManager: React.FC = () => {
                 </div>
               )}
             </>
+          )}
+
+          {/* Transaction Edit Modal */}
+          {showTxnModal && editingTransaction && txnForm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+              <div className="bg-white p-6 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold">Edit Transaction</h3>
+                  <button onClick={() => { setShowTxnModal(false); setEditingTransaction(null); setTxnForm(null); }} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+                </div>
+
+                <form onSubmit={handleSubmitTxnEdit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                    <input name="amount" type="number" value={txnForm.amount ?? ''} onChange={handleTxnChange} className="w-full px-4 py-3 border border-gray-200 rounded-xl" required />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select name="type" value={txnForm.type || 'received'} onChange={handleTxnChange} className="w-full px-4 py-3 border border-gray-200 rounded-xl">
+                      <option value="received">Received</option>
+                      <option value="paid">Paid</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input name="date" type="datetime-local" value={txnForm.date ? new Date(txnForm.date).toISOString().slice(0, 16) : ''} onChange={handleTxnChange} className="w-full px-4 py-3 border border-gray-200 rounded-xl" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea name="description" value={txnForm.description || ''} onChange={handleTxnChange} className="w-full px-4 py-3 border border-gray-200 rounded-xl" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
+                    <input name="employee" value={txnForm.employee || ''} onChange={handleTxnChange} className="w-full px-4 py-3 border border-gray-200 rounded-xl" />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button type="submit" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl">Save</button>
+                    <button type="button" onClick={() => { setShowTxnModal(false); setEditingTransaction(null); setTxnForm(null); }} className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-xl">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
           )}
 
           {/* Add/Edit Record Modal */}
@@ -1120,33 +1608,29 @@ const CostManager: React.FC = () => {
                     </select>
                   </div>
 
-                  {formData.category === "other" && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                        <select
-                          name="type"
-                          value={formData.type}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        >
-                          <option value="debit">Debit</option>
-                          <option value="credit">Credit</option>
-                        </select>
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      name="type"
+                      value={formData.type}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      <option value="debit">Debit</option>
+                      <option value="credit">Credit</option>
+                    </select>
+                  </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                        <textarea
-                          name="description"
-                          placeholder="Enter description (optional)..."
-                          value={formData.description}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all min-h-20"
-                        />
-                      </div>
-                    </>
-                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      name="description"
+                      placeholder="Enter description (optional)..."
+                      value={formData.description}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all min-h-20"
+                    />
+                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
@@ -1273,16 +1757,84 @@ const CostManager: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-4 mt-8">
-                  <button
-                    onClick={() => {
-                      setShowDetailModal(false);
-                      handleEdit(costs.findIndex(c => c.firebaseID === selectedRecord.firebaseID));
-                    }}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition-all"
-                  >
-                    Edit Record
-                  </button>
+               
+                 {/* Transactions list (table) */}
+                    <div className="pt-4">
+                      <label className="text-xs uppercase font-bold text-gray-500 block mb-2">Transactions</label>
+                      {selectedRecord.transactions && selectedRecord.transactions.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full table-auto text-sm border-collapse">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-200">
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Type</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Amount</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Date</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Balance</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Description</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Employee</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedRecord.transactions.map((t, idx) => (
+                                <tr key={t.id || idx} className="border-b last:border-b-0">
+                                  <td className="px-3 py-3 align-top">
+                                    <span className={`font-semibold ${t.type === 'paid' ? 'text-red-600' : 'text-green-600'}`}>{t.type ? t.type.toUpperCase() : '—'}</span>
+                                  </td>
+                                  <td className="px-3 py-3 text-right align-top font-medium">Rs {t.amount}</td>
+                                  <td className="px-3 py-3 text-left align-top text-gray-600">{t.date ? new Date(t.date).toLocaleString() : ''}</td>
+                                  <td className="px-3 py-3 text-right align-top font-semibold">Rs {t.balanceAfter}</td>
+                                  <td className="px-3 py-3 align-top text-gray-700">{t.description || '-'}</td>
+                                  <td className="px-3 py-3 align-top text-gray-700">{t.employee || '-'}</td>
+                                  <td className="px-3 py-3 text-right align-top">
+                                    <div className="inline-flex items-center gap-2">
+                                      <button
+                                        onClick={() => openEditTransaction(selectedRecord.firebaseID, t)}
+                                        className="text-blue-600 hover:text-blue-800 p-1"
+                                        title="Edit Transaction"
+                                      >
+                                        <Edit2 className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteTransaction(selectedRecord.firebaseID, t.id as string)}
+                                        className="text-red-600 hover:text-red-800 p-1"
+                                        title="Delete Transaction"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">No transactions yet for this record.</div>
+                      )}
+
+                      {/* Add transaction quick form (full width) */}
+                      <div className="mt-4 p-3 bg-white rounded-lg border border-gray-100">
+                        <div className="text-sm font-semibold mb-2">Add / Subtract Amount</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <input name="amount" type="number" placeholder="Amount" value={newTxn.amount ?? ''} onChange={handleNewTxnChange} className="px-3 py-2 border rounded w-full" />
+                          <select name="type" value={newTxn.type || 'paid'} onChange={handleNewTxnChange} className="px-3 py-2 border rounded w-full">
+                            <option value="paid">PAID (to employee)</option>
+                            <option value="received">CREDIT / RECEIVED</option>
+                          </select>
+                          <input name="employee" placeholder="Employee (optional)" value={newTxn.employee || ''} onChange={handleNewTxnChange} className="px-3 py-2 border rounded w-full" />
+                        </div>
+                        <div className="mt-3">
+                          <input name="description" placeholder="Description (optional)" value={newTxn.description || ''} onChange={handleNewTxnChange} className="w-full px-3 py-2 border rounded" />
+                        </div>
+                        <div className="flex gap-3 mt-3 justify-end">
+                          <button type="button" onClick={() => handleAddTransaction(selectedRecord.firebaseID)} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Add Transaction</button>
+                          <button type="button" onClick={() => setNewTxn({ amount: 0, type: 'paid', description: '', employee: '' })} className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded">Clear</button>
+                        </div>
+                      </div>
+                    </div>
+                     <div className="flex gap-4 mt-8">
+                
                   <button
                     onClick={() => setShowDetailModal(false)}
                     className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-xl transition-all"
@@ -1291,6 +1843,7 @@ const CostManager: React.FC = () => {
                   </button>
                 </div>
               </div>
+              
             </div>
           )}
 
